@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ku">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سپی فلم - سیستەمێ نوی</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma; background: #0f2027; color: white; text-align: center; padding: 10px; margin: 0; }
+        .page { display: none; padding: 10px; }
+        .btn { display: block; width: 80%; max-width: 300px; padding: 15px; margin: 10px auto; background: #2c5364; color: #87E0DC; border-radius: 50px; text-decoration: none; border: 1px solid #87E0DC; font-weight: bold; }
+        .movie-card { width: 150px; padding: 10px; background: #203a43; border-radius: 15px; display: inline-block; margin: 5px; cursor: pointer; border: 1px solid #87E0DC; text-decoration: none; color: white; vertical-align: top; }
+        img { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; }
+        #search-box { width: 90%; max-width: 400px; padding: 12px; margin-bottom: 20px; border-radius: 50px; border: 2px solid #87E0DC; background: #0f2027; color: white; text-align: center; }
+        
+        /* بۆ کۆمپیوترێ: ئەگەر شاشە مەزن بوو، کارتێن فلمی دێ مەزنتر بن */
+        @media (min-width: 600px) {
+            .movie-card { width: 200px; }
+            img { height: 250px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="p1" class="page" style="display:block;">
+    <h2>زمان هەلبژێرە</h2>
+    <a href="#" class="btn" onclick="next('p2', 'lang', 'badini')">بادینی</a>
+    <a href="#" class="btn" onclick="next('p2', 'lang', 'sorani')">سۆرانی</a>
+</div>
+
+<div id="p2" class="page"><h2>جۆرێ فلمی</h2><div id="cat-list"></div></div>
+<div id="p3" class="page"><h2>جۆرێ (Genre)</h2><div id="genre-list"></div></div>
+<div id="p4" class="page">
+    <h2>فلمی هەلبژێرە</h2>
+    <input type="text" id="search-box" placeholder="🔎 سێرچ..." onkeyup="searchMovies()">
+    <div id="movie-list"></div>
+</div>
+<div id="p5" class="page"><h2 id="movie-title">سیزنان</h2><div id="season-list"></div></div>
+<div id="p6" class="page"><h2 id="season-title">حەلقە</h2><div id="ep-list"></div></div>
+
+<script>
+    let data = [], filters = {};
+
+    fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0d7DwTQ0uVESBq8uHwAus5JD0-fdKI4XyDNSyQ1KZubkfU_keOBB8oMmDvguizoFMNoqujNpIzlio/pub?output=csv')
+    .then(res => res.text()).then(csv => {
+        data = csv.split('\n').slice(1).map(row => {
+            const c = row.split(',');
+            return { lang: c[0]?.trim(), cat: c[1]?.trim(), genre: c[2]?.trim(), name: c[3]?.trim(), season: c[4]?.trim(), ep: c[5]?.trim(), link: c[6]?.trim(), img: c[7]?.trim() };
+        }).filter(item => item.lang);
+    });
+
+    function next(page, key, val) {
+        if(key) filters[key] = val;
+        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+        document.getElementById(page).style.display = 'block';
+        updateUI(page);
+    }
+
+    function updateUI(page) {
+        if(page == 'p2') render('cat-list', 'cat', 'p3');
+        if(page == 'p3') {
+            const container = document.getElementById('genre-list');
+            container.innerHTML = '';
+            if(filters.cat === 'فلم بێو') {
+                const genres = [...new Set(data.filter(m => m.lang === filters.lang && m.cat === filters.cat).map(m => m.genre).filter(n => n))];
+                if(genres.length > 0) {
+                    genres.forEach(g => container.innerHTML += `<a href="#" class="btn" onclick="next('p4', 'genre', '${g}')">${g}</a>`);
+                } else { next('p4', 'genre', ''); }
+            } else { next('p4', 'genre', ''); }
+        }
+        if(page == 'p4') renderMovies();
+        if(page == 'p5') renderSeasons();
+        if(page == 'p6') renderEpisodes();
+    }
+
+    function render(divId, key, nextPage) {
+        const container = document.getElementById(divId);
+        container.innerHTML = '';
+        const items = [...new Set(data.filter(m => m.lang === filters.lang).map(m => m[key]).filter(n => n))];
+        items.forEach(i => container.innerHTML += `<a href="#" class="btn" onclick="next('${nextPage}', '${key}', '${i}')">${i}</a>`);
+    }
+
+    function renderMovies(query = '') {
+        const container = document.getElementById('movie-list');
+        container.innerHTML = '';
+        const filtered = data.filter(m => 
+            m.lang === filters.lang && 
+            m.cat === filters.cat && 
+            (filters.genre ? m.genre === filters.genre : true) &&
+            m.name.toLowerCase().includes(query.toLowerCase())
+        );
+        [...new Set(filtered.map(m => m.name))].forEach(name => {
+            const m = data.find(x => x.name === name);
+            container.innerHTML += `<div class="movie-card" onclick="next('p5', 'name', '${name}')"><img src="${m.img}"><h3>${name}</h3></div>`;
+        });
+    }
+
+    function searchMovies() { renderMovies(document.getElementById('search-box').value); }
+    function renderSeasons() {
+        const container = document.getElementById('season-list');
+        container.innerHTML = '';
+        [...new Set(data.filter(m => m.name === filters.name).map(m => m.season))].forEach(s => {
+            container.innerHTML += `<a href="#" class="btn" onclick="next('p6', 'season', '${s}')">${s}</a>`;
+        });
+    }
+
+    function renderEpisodes() {
+        const container = document.getElementById('ep-list');
+        container.innerHTML = '';
+        document.getElementById('season-title').innerText = filters.name + " - " + filters.season;
+        data.filter(m => m.name === filters.name && m.season === filters.season).forEach(m => {
+            container.innerHTML += `<a href="${m.link}" class="movie-card"><img src="${m.img}"><h3>حەلقە ${m.ep}</h3></a>`;
+        });
+    }
+</script>
+</body>
+</html>
